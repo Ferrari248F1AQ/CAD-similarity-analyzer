@@ -1,0 +1,106 @@
+{
+  "paper_writing_mode": {
+    "enabled": true,
+    "show_toggle": true,
+    "description": "When enabled, activates Paper Writing features: plagiarism labeling and LaTeX export. Set show_toggle to true to display the toggle in the navbar.",
+    "default_similarity_threshold": 0.75,
+    "track_regex_patterns": [
+      "A(\\d{2,4})",
+      "TRACCIA[_\\s]?(\\d+)",
+      "TRACK[_\\s]?(\\d+)",
+      "T(\\d{2,4})",
+      "ES[_\\s]?(\\d+)",
+      "EX[_\\s]?(\\d+)"
+    ],
+    "optimization": {
+      "strict_path_labeled_pairs_only": true
+    },
+    "outlier_label": "OUTLIER"
+  },
+  "show_sketch_parametric": true,
+  "criteria_exclusion_policy": {
+    "enabled": true,
+    "exclude_if_unavailable": true,
+    "exclude_if_missing_or_non_finite": true,
+    "force_excluded": [],
+    "force_included": [
+      "constraint_2d_similarity",
+      "constraint_ratio_similarity"
+    ]
+  },
+  "default_weights": {
+    "author_match": 0.02,
+    "feature_count_similarity": 0.05,
+    "feature_type_similarity": 0.11,
+    "style_similarity": 0.04,
+    "bigram_similarity": 0.02,
+    "trigram_similarity": 0.03,
+    "lcs_similarity": 0.25,
+    "feature_names_similarity": 0.02,
+    "geometry_2d_similarity": 0.26,
+    "constraint_2d_similarity": 0.11,
+    "constraint_ratio_similarity": 0.09,
+    "sketch_parametric_similarity": 0.0,
+    "lcs_fuzzy_enabled": true,
+    "lcs_fuzzy_function": "exponential",
+    "lcs_fuzzy_alpha": 2.0,
+    "lcs_fuzzy_mix": 0.7,
+    "fuzzy_combination_enabled": false,
+    "fuzzy_combination_method": "gaussian",
+    "fuzzy_combination_penalty": 0.15,
+    "fuzzy_combination_boost": 0.3
+  },
+  "threshold_default": 0.7,
+  "matrix_display": {
+    "cell_size_default": "medium",
+    "font_size_default": "small",
+    "show_percentages": true
+  },
+  "lcs_fuzzy_options": {
+    "description": "Fuzzy logic configuration for LCS (early features can be weighted more)",
+    "lcs_fuzzy_enabled": {
+      "description": "Enable/disable fuzzy weighting (true = early features weigh more, false = uniform weighting)",
+      "default": true
+    },
+    "lcs_fuzzy_function": {
+      "description": "Mathematical function used for weighting",
+      "options": [
+        "linear",
+        "exponential",
+        "logarithmic"
+      ],
+      "default": "exponential",
+      "details": {
+        "linear": "Linearly decreasing weight (1.0 -> 0.0)",
+        "exponential": "Exponentially decreasing weight (early features weigh much more)",
+        "logarithmic": "Logarithmically decreasing weight (gradual transition)"
+      }
+    },
+    "lcs_fuzzy_alpha": {
+      "description": "Curvature parameter for exp/log (higher = stronger difference between early and late features)",
+      "range": [
+        0.5,
+        5.0
+      ],
+      "default": 2.0,
+      "suggestions": {
+        "0.5-1.0": "Mild weighting difference",
+        "1.5-2.5": "Moderate weighting difference (recommended)",
+        "3.0-5.0": "Aggressive weighting difference"
+      }
+    },
+    "lcs_fuzzy_mix": {
+      "description": "Mix between fuzzy and standard LCS (0.0 = standard only, 1.0 = fuzzy only)",
+      "range": [
+        0.0,
+        1.0
+      ],
+      "default": 0.7,
+      "suggestions": {
+        "0.7": "70% fuzzy, 30% standard (balanced, recommended)",
+        "0.5": "50/50 (moderate)",
+        "1.0": "100% fuzzy (aggressive)"
+      }
+    }
+  }
+}

@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CAD Similarity Analyzer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}?v={{ range(100000, 999999) | random }}" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-primary">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="bi bi-boxes"></i> CAD Similarity Analyzer
+            </span>
+
+            <!-- ✨ CAD Type Selector -->
+            <div class="d-flex align-items-center">
+                <!-- Paper Writing Mode Toggle -->
+                <div class="form-check form-switch me-3" id="paperWritingToggleContainer" style="display: {% if paper_mode_show_toggle %}block{% else %}none{% endif %};">
+                    <input class="form-check-input" type="checkbox" id="paperWritingModeToggle"
+                           {% if paper_mode_enabled %}checked{% endif %}
+                           onchange="togglePaperWritingMode(this.checked)">
+                    <label class="form-check-label text-light small" for="paperWritingModeToggle">
+                        <i class="bi bi-journal-text"></i> Paper Mode
+                    </label>
+                </div>
+
+                <div class="btn-group me-3" role="group" aria-label="CAD Type Selector" id="cadTypeSelector">
+                    <input type="radio" class="btn-check" name="cadType" id="cadSolidEdge" value="SolidEdge" autocomplete="off" checked>
+                    <label class="btn btn-outline-light btn-sm" for="cadSolidEdge" title="Solid Edge (.par, .psm, .asm)">
+                        <i class="bi bi-box"></i> Solid Edge
+                    </label>
+
+                    <input type="radio" class="btn-check" name="cadType" id="cadSolidWorks" value="SolidWorks" autocomplete="off">
+                    <label class="btn btn-outline-light btn-sm" for="cadSolidWorks" title="SolidWorks (.sldprt, .sldasm)">
+                        <i class="bi bi-gear"></i> SolidWorks
+                    </label>
+
+                    <input type="radio" class="btn-check" name="cadType" id="cadInventor" value="Inventor" autocomplete="off">
+                    <label class="btn btn-outline-light btn-sm" for="cadInventor" title="Autodesk Inventor (.ipt, .iam)">
+                        <i class="bi bi-grid-3x3"></i> Inventor
+                    </label>
+
+                    <input type="radio" class="btn-check" name="cadType" id="cadCATIA" value="CATIA" autocomplete="off">
+                    <label class="btn btn-outline-light btn-sm" for="cadCATIA" title="CATIA V5 (.catpart, .catproduct)">
+                        <i class="bi bi-layers"></i> CATIA
+                    </label>
+
+                    <input type="radio" class="btn-check" name="cadType" id="cadFreeCAD" value="FreeCAD" autocomplete="off">
+                    <label class="btn btn-outline-light btn-sm" for="cadFreeCAD" title="FreeCAD (.fcstd)">
+                        <i class="bi bi-wrench"></i> FreeCAD
+                    </label>
+
+                    <input type="radio" class="btn-check" name="cadType" id="cadFusion360" value="Fusion360" autocomplete="off">
+                    <label class="btn btn-outline-light btn-sm" for="cadFusion360" title="Fusion 360 (.f3d, .f3z)">
+                        <i class="bi bi-cloud"></i> Fusion 360
+                    </label>
+
+                    <input type="radio" class="btn-check" name="cadType" id="cadAuto" value="auto" autocomplete="off">
+                    <label class="btn btn-outline-warning btn-sm" for="cadAuto" title="Detect automatically from file">
+                        <i class="bi bi-magic"></i> Auto
+                    </label>
+                </div>
+
+                <span class="navbar-text text-light" id="status-indicator">
+                    <span class="badge bg-secondary">Initializing...</span>
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Global Status Bar -->
+    <div id="globalStatusBar" class="global-status-bar d-none">
+        <div class="status-content">
+            <div class="status-icon">
+                <i class="bi bi-hourglass-split spinner"></i>
+            </div>
+            <div class="status-info">
+                <div class="status-message" id="statusMessage">Initializing...</div>
+                <div class="progress status-progress">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated"
+                         id="statusProgressBar" role="progressbar" style="width: 0%">
+                        <span class="progress-text" id="progressText">0%</span>
+                    </div>
+                </div>
+                <div class="status-details" id="statusDetails"></div>
+            </div>
+            <button class="btn btn-sm btn-light" id="closeStatusBtn" onclick="closeStatusBar()">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
+    </div>
+
+    <div class="container-fluid mt-3">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3">
+                <div class="card mb-3">
+                    <div class="card-header bg-secondary text-white">
+                        <i class="bi bi-folder2-open"></i> Directory Analysis
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="directoryPath" class="form-label">Folder path:</label>
+                            <input type="text" class="form-control" id="directoryPath"
+                                   placeholder="C:\path\to\cad\files">
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="skipLeafCheckbox">
+                            <label class="form-check-label" for="skipLeafCheckbox">Skip same leaf folder comparisons</label>
+                        </div>
+                        <button class="btn btn-primary w-100" id="btnAnalyze" onclick="analyzeDirectory()">
+                            <i class="bi bi-search"></i> Analyze
+                        </button>
+                        <button class="btn btn-info w-100 mt-2" id="btnLoadResults" onclick="loadSavedResults(document.getElementById('directoryPath').value)">
+                            <i class="bi bi-download"></i> Load Saved Results
+                        </button>
+                        <button class="btn btn-danger w-100 mt-2" id="btnPurge" onclick="purgeCache()">
+                            <i class="bi bi-trash"></i> Purge Cache
+                        </button>
+                        <div class="progress mt-2 d-none" id="progressBar">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                 role="progressbar" style="width: 100%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Paper Writing Mode Panel (shown only when enabled) -->
+                <div class="card mb-3 border-warning {% if not paper_mode_enabled %}d-none{% endif %}" id="paperWritingPanel">
+                    <div class="card-header bg-warning text-dark">
+                        <i class="bi bi-journal-text"></i> Paper Writing Mode
+                    </div>
+                    <div class="card-body">
+                        <p class="small text-muted mb-2">
+                            <i class="bi bi-info-circle"></i> Root -> Sessions -> [MECCANICI/NON MECCANICI] -> .par
+                        </p>
+
+                        <!-- Dedicated plagiarism threshold -->
+                        <div class="mb-3">
+                            <label for="paperThresholdSlider" class="form-label small fw-bold">
+                                Plagiarism threshold: <span id="paperThresholdValue">{{ paper_mode_threshold_pct }}%</span>
+                            </label>
+                            <input type="range" class="form-range" id="paperThresholdSlider"
+                                   min="50" max="100" value="{{ paper_mode_threshold_pct }}"
+                                   oninput="updatePaperThreshold(this.value)">
+                            <div class="d-flex justify-content-between small text-muted">
+                                <span>50%</span><span>100%</span>
+                            </div>
+                        </div>
+
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="paperHideCrossSessionSwitch"
+                                   onchange="toggleHideCrossSessionPairs(this.checked)">
+                            <label class="form-check-label small fw-bold" for="paperHideCrossSessionSwitch">
+                                Hide cross-session pairs
+                            </label>
+                            <div class="small text-muted">
+                                Show only pairs that belong to the same session.
+                            </div>
+                        </div>
+
+                        <button class="btn btn-outline-warning w-100 mb-2" id="btnExportLatex" onclick="exportLatexTable()">
+                            <i class="bi bi-file-earmark-code"></i> Export LaTeX Table
+                        </button>
+                        <button class="btn btn-outline-secondary w-100 mb-2" onclick="showPlagiarismStats()">
+                            <i class="bi bi-graph-up"></i> Label Statistics
+                        </button>
+                        <button class="btn btn-outline-danger w-100" onclick="clearPaperStats()" id="btnClearPaperStats">
+                            <i class="bi bi-trash"></i> Clear All Labels
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-header bg-secondary text-white">
+                        <i class="bi bi-sliders"></i> Filters
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="thresholdSlider" class="form-label">
+                                Similarity threshold: <span id="thresholdValue">70%</span>
+                            </label>
+                            <input type="range" class="form-range" id="thresholdSlider"
+                                   min="0" max="100" value="70" onchange="updateThreshold()">
+                        </div>
+                        <button class="btn btn-outline-secondary w-100" onclick="filterPairs()">
+                            <i class="bi bi-funnel"></i> Apply Filter
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Global Similarity Weights - Valid for entire application -->
+                <div class="card mb-3">
+                    <div class="card-header bg-secondary text-white">
+                        <i class="bi bi-sliders"></i> Global Similarity Weights
+                    </div>
+                    <div class="card-body">
+                        <p class="small text-muted mb-3">
+                            <i class="bi bi-info-circle"></i> These weights are used for <strong>all analyses and comparisons</strong>
+                        </p>
+                        <div class="row" id="weightsContainer">
+                            <!-- Weights will be dynamically inserted by JS -->
+                        </div>
+
+                        <!-- ✨ Fuzzy LCS Function (simple) -->
+                        <div class="mt-3 p-2 bg-light rounded">
+                            <label class="form-label small mb-2">
+                                <i class="bi bi-shuffle"></i> <strong>Fuzzy LCS Logic:</strong>
+                            </label>
+                            <select class="form-select form-select-sm" id="lcsFuzzyFunction" onchange="updateLCSFuzzyFunction(this.value)">
+                                <option value="none">Disabled (all features weigh equally)</option>
+                                <option value="linear">Linear (initial features weigh a bit more)</option>
+                                <option value="exponential" selected>Exponential (initial features weigh much more) ⭐</option>
+                                <option value="logarithmic">Logarithmic (gradual transition)</option>
+                            </select>
+                            <small class="text-muted d-block mt-1" id="lcsFuzzyDesc">
+                                Initial features weigh much more (recommended for plagiarism detection)
+                            </small>
+                        </div>
+
+                        <!-- ✨ Fuzzy Combination (Coherence-based) -->
+                        <div class="mt-3 p-2 border border-warning rounded">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="fuzzyCombinationToggle" onchange="toggleFuzzyCombination(this.checked)">
+                                <label class="form-check-label small" for="fuzzyCombinationToggle">
+                                    <strong>🧠 Fuzzy Coherence: Reward Consistent Criteria</strong>
+                                    <button class="btn btn-sm btn-link p-0 ms-1" type="button" data-bs-toggle="collapse" data-bs-target="#fuzzyHelp">
+                                        <i class="bi bi-question-circle"></i>
+                                    </button>
+                                </label>
+                            </div>
+                            <div class="collapse mb-2" id="fuzzyHelp">
+                                <div class="alert alert-info alert-sm mb-0 p-2">
+                                    <small>
+                                        <strong>How it works:</strong><br>
+                                        Measures how much the similarity criteria <em>agree with each other</em> (weighted by importance).<br>
+                                        • <strong>Real plagiarism</strong> (all criteria high & coherent): similarity stays <strong>unchanged</strong><br>
+                                        • <strong>False positive</strong> (some high, some low): similarity is <strong>reduced</strong><br>
+                                        • <strong>Not plagiarism</strong> (all low & uniform): similarity stays <strong>unchanged</strong><br><br>
+                                        <strong>Key:</strong> Low-weight criteria (e.g. author 2%) barely affect the coherence score,
+                                        so a plagiarist changing just the author name won't cause a false reduction.
+                                    </small>
+                                </div>
+                            </div>
+                            <div id="fuzzyPenaltyControl" style="display: none;">
+                                <label class="form-label small">
+                                    Coherence function:
+                                </label>
+                                <select class="form-select form-select-sm mb-2" id="fuzzyMethodSelect" onchange="updateFuzzyMethod(this.value)">
+                                    <option value="triangular">Triangular (Linear, Strict)</option>
+                                    <option value="gaussian" selected>Gaussian (Smooth, Recommended) ⭐</option>
+                                    <option value="sugeno">Sugeno (Tolerant, Permissive)</option>
+                                </select>
+
+                                <label class="form-label small">
+                                    Influence: <strong id="fuzzyPenaltyDisplay">30%</strong>
+                                </label>
+                                <input type="range" class="form-range form-range-sm" min="0" max="100" value="30"
+                                       id="fuzzyPenaltySlider" oninput="updateFuzzyPenalty(this.value)">
+                                <div class="d-flex justify-content-between">
+                                    <small class="text-muted">0% = linear only</small>
+                                    <small class="text-muted">50%</small>
+                                    <small class="text-muted">100% = full coherence</small>
+                                </div>
+                                <small class="text-muted d-block mt-1" id="fuzzyPenaltyDesc">
+                                    At 0% fuzzy has no effect. At 100% discordant criteria are maximally reduced.
+                                </small>
+                            </div>
+                        </div>
+
+                        <div class="mt-3">
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-sm btn-warning" onclick="recalculateAllPairs()">
+                                    <i class="bi bi-arrow-repeat"></i> Apply Weights (recalculate)
+                                </button>
+                                <button class="btn btn-sm btn-success" onclick="saveGlobalWeights()">
+                                    <i class="bi bi-save"></i> Save Global Weights
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="resetWeights()">
+                                    <i class="bi bi-arrow-counterclockwise"></i> Reset Defaults
+                                </button>
+                            </div>
+                            <div class="text-center mt-3 p-2 bg-light rounded">
+                                <span class="fw-bold" id="weightsTotalDisplay">
+                                    <i class="bi bi-percent"></i> Total: <span id="weightsTotalValue">100</span>%
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header bg-secondary text-white">
+                        <i class="bi bi-info-circle"></i> Statistics
+                    </div>
+                    <div class="card-body" id="statsPanel">
+                        <p class="text-muted">No analysis performed</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-md-9">
+                <!-- Tabs -->
+                <ul class="nav nav-tabs" id="mainTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="pairs-tab" data-bs-toggle="tab"
+                                data-bs-target="#pairs" type="button" role="tab">
+                            <i class="bi bi-link-45deg"></i> Similar Pairs
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="files-tab" data-bs-toggle="tab"
+                                data-bs-target="#files" type="button" role="tab">
+                            <i class="bi bi-file-earmark"></i> Analyzed Files
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="matrix-tab" data-bs-toggle="tab"
+                                data-bs-target="#matrix" type="button" role="tab">
+                            <i class="bi bi-grid-3x3"></i> Matrix
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="compare-tab" data-bs-toggle="tab"
+                                data-bs-target="#compare" type="button" role="tab">
+                            <i class="bi bi-arrow-left-right"></i> Comparison
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="optimize-tab" data-bs-toggle="tab"
+                                data-bs-target="#optimize" type="button" role="tab">
+                            <i class="bi bi-sliders2"></i> Weights Optimization
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="mainTabsContent">
+                    <!-- Tab: Similar Pairs -->
+                    <div class="tab-pane fade show active" id="pairs" role="tabpanel">
+                        <div class="card mt-3">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="bi bi-diagram-3"></i> Pairs with High Similarity
+                                </h5>
+                                <div id="pairsContainer">
+                                    <p class="text-muted">Analyze a directory to see similar pairs.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Analyzed Files -->
+                    <div class="tab-pane fade" id="files" role="tabpanel">
+                        <div class="card mt-3">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="bi bi-collection"></i> All Analyzed Files
+                                </h5>
+                                <div class="table-responsive">
+                                    <table class="table table-hover" id="filesTable">
+                                        <thead>
+                                            <tr>
+                                                <th>File</th>
+                                                <th>CAD</th>
+                                                <th>Folder</th>
+                                                <th>Author</th>
+                                                <th>3D Features</th>
+                                                <th>2D Geom</th>
+                                                <th>2D Constraints</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="filesTableBody">
+                                            <tr>
+                                                <td colspan="8" class="text-muted text-center">
+                                                    No files analyzed
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Matrix -->
+                    <div class="tab-pane fade" id="matrix" role="tabpanel">
+                        <div class="card mt-3">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="bi bi-grid"></i> Similarity Matrix
+                                </h5>
+
+                                <!-- Matrix display controls -->
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label"><i class="bi bi-zoom-in"></i> Cell size:</label>
+                                        <select class="form-select form-select-sm" id="matrixCellSize" onchange="updateMatrixDisplay()">
+                                            <option value="compact">Compact (very small)</option>
+                                            <option value="small">Small</option>
+                                            <option value="medium" selected>Medium</option>
+                                            <option value="large">Large</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label"><i class="bi bi-fonts"></i> Font size:</label>
+                                        <select class="form-select form-select-sm" id="matrixFontSize" onchange="updateMatrixDisplay()">
+                                            <option value="x-small">Very small</option>
+                                            <option value="small" selected>Small</option>
+                                            <option value="medium">Medium</option>
+                                            <option value="large">Large</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label"><i class="bi bi-eye"></i> Show:</label>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="matrixShowPercent" checked onchange="updateMatrixDisplay()">
+                                            <label class="form-check-label" for="matrixShowPercent">
+                                                Percentages
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div id="matrixContainer" class="table-responsive" style="max-height: 70vh; overflow: auto;">
+                                    <p class="text-muted">Analyze a directory to see the matrix.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Comparison -->
+                    <div class="tab-pane fade" id="compare" role="tabpanel">
+                        <div class="card mt-3">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="bi bi-columns-gap"></i> Detailed Comparison
+                                </h5>
+
+                                <!-- File Selectors -->
+                                <div class="row mb-3">
+                                    <div class="col-md-5">
+                                        <label class="form-label"><strong>File 1:</strong></label>
+                                        <select class="form-select" id="compareFile1">
+                                            <option value="">Select first file...</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2 text-center align-self-end">
+                                        <button class="btn btn-primary" onclick="compareFiles()">
+                                            <i class="bi bi-search"></i> Compare
+                                        </button>
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label"><strong>File 2:</strong></label>
+                                        <select class="form-select" id="compareFile2">
+                                            <option value="">Select second file...</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- Modifiable Weights Panel (collapsible) -->
+                                <div class="accordion mb-3" id="weightsAccordion">
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header">
+                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#weightsPanel">
+                                                <i class="bi bi-sliders me-2"></i> Modify Similarity Weights
+                                            </button>
+                                        </h2>
+                                        <div id="weightsPanel" class="accordion-collapse collapse" data-bs-parent="#weightsAccordion">
+                                            <div class="accordion-body">
+                                                <div class="row" id="compareWeightsContainer">
+                                                    <!-- Weights will be dynamically inserted by JavaScript when accordion opens -->
+                                                </div>
+                                                <div class="mt-3">
+                                                    <button class="btn btn-sm btn-outline-primary" onclick="resetWeights()">
+                                                        <i class="bi bi-arrow-counterclockwise"></i> Reset Defaults
+                                                    </button>
+                                                    <button class="btn btn-sm btn-primary ms-2" onclick="applyWeightsAndCompare()">
+                                                        <i class="bi bi-check"></i> Apply and Recalculate
+                                                    </button>
+                                                    <span class="ms-3 text-muted" id="compareWeightsTotalDisplay">Total: 100%</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <script>
+                                // Populate compare sliders when the accordion opens
+                                document.getElementById('weightsPanel').addEventListener('shown.bs.collapse', function () {
+                                    console.log('Compare weights accordion opened; initializing controls.');
+                                    if (typeof initCompareWeightsPanel === 'function') {
+                                        initCompareWeightsPanel();
+                                    }
+                                });
+                                </script>
+
+                                <!-- Similarity Result -->
+                                <div id="compareSimilarityResult" class="mb-3"></div>
+
+                                <!-- Side-by-side Comparison with Independent Scrolling -->
+                                <div class="row" id="compareDetailedResult" style="display: none;">
+                                    <!-- File 1 Column -->
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-header bg-primary text-white">
+                                                <strong id="compareFile1Title">File 1</strong>
+                                            </div>
+                                            <div class="card-body compare-scroll-panel" id="compareFile1Details">
+                                                <!-- File 1 Content -->
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- File 2 Column -->
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-header bg-success text-white">
+                                                <strong id="compareFile2Title">File 2</strong>
+                                            </div>
+                                            <div class="card-body compare-scroll-panel" id="compareFile2Details">
+                                                <!-- File 2 Content -->
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Weights Optimization -->
+                    <div class="tab-pane fade" id="optimize" role="tabpanel">
+                        <div class="card mt-3">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="bi bi-sliders2-vertical"></i> Iterative Weight Optimization
+                                </h5>
+                                <p class="text-muted mb-3">
+                                    Start from current global weights, then refine using manual labels:
+                                    <strong>Confirmed Plagiarism</strong> as positive class and
+                                    <strong>Not Plagiarism</strong> as negative class, with session-aware filtering.
+                                    All non-author criteria stay active during optimization; <code>author_match</code> is excluded.
+                                </p>
+
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-3">
+                                        <label class="form-label">Scope</label>
+                                        <select class="form-select form-select-sm" id="optimizationScope" onchange="onOptimizationScopeChange()">
+                                            <option value="all" selected>All labeled sessions</option>
+                                            <option value="current">Current session only</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4 d-none" id="optimizationCurrentSessionRow">
+                                        <label class="form-label">Current session name</label>
+                                        <input type="text" class="form-control form-control-sm" id="optimizationCurrentSession"
+                                               placeholder="Exam 03-07-2024">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">Threshold</label>
+                                        <input type="number" class="form-control form-control-sm" id="optimizationThreshold"
+                                               min="0.50" max="0.99" step="0.01" value="{{ '%.2f' % paper_mode_threshold_float }}">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">Max Iter</label>
+                                        <input type="number" class="form-control form-control-sm" id="optimizationMaxIter"
+                                               min="5" max="500" step="5" value="120">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label d-block">Start from UI</label>
+                                        <div class="form-check form-switch" title="Use current UI weights as optimization starting point">
+                                            <input class="form-check-input" type="checkbox" id="optimizationStartFromUi" checked>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-1">
+                                        <label class="form-label d-block">Author off</label>
+                                        <div class="form-check form-switch" title="author_match is always excluded from optimization">
+                                            <input class="form-check-input" type="checkbox" id="optimizationIgnoreAuthor" checked disabled>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="border rounded p-3 bg-light mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <label class="form-label mb-0">
+                                            <i class="bi bi-check2-square"></i> Sessions Included In Optimization
+                                        </label>
+                                        <div class="btn-group btn-group-sm" role="group" aria-label="Session selection controls">
+                                            <button type="button" class="btn btn-outline-primary" id="btnOptimizationSelectAllSessions" onclick="optimizationSelectAllSessions()">
+                                                All
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary" id="btnOptimizationSelectNoSessions" onclick="optimizationSelectNoSessions()">
+                                                None
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div id="optimizationSessionSelectionStatus" class="small text-muted mb-2">
+                                        Refresh Dataset to load available sessions.
+                                    </div>
+                                    <div id="optimizationSessionSelector" class="small text-muted">
+                                        No session metadata loaded yet.
+                                    </div>
+                                </div>
+
+                                <div class="d-flex gap-2 mb-3">
+                                    <button class="btn btn-outline-secondary btn-sm" id="btnOptimizationRefresh" onclick="refreshOptimizationDataset()">
+                                        <i class="bi bi-arrow-repeat"></i> Refresh Dataset
+                                    </button>
+                                    <button class="btn btn-primary btn-sm" id="btnOptimizationRun" onclick="runIterativeOptimization()">
+                                        <i class="bi bi-activity"></i> Optimize Iteratively
+                                    </button>
+                                    <button class="btn btn-success btn-sm" onclick="runIterativeOptimization(true)">
+                                        <i class="bi bi-save"></i> Optimize + Save Global Weights
+                                    </button>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-5">
+                                        <div class="border rounded p-3 bg-light">
+                                            <h6 class="mb-2"><i class="bi bi-database"></i> Training Dataset</h6>
+                                            <div id="optimizationDatasetSummary" class="small text-muted">
+                                                Click "Refresh Dataset" to load label coverage and session statistics.
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-7">
+                                        <div class="border rounded p-3">
+                                            <h6 class="mb-2"><i class="bi bi-graph-up"></i> Optimization Results</h6>
+                                            <div id="optimizationResults" class="small text-muted">
+                                                No optimization run yet.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Detail Modal -->
+    <div class="modal fade" id="fileDetailModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="fileDetailTitle">File Details</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="fileDetailBody">
+                    <!-- Dynamic content -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LaTeX Export Modal -->
+    <div class="modal fade" id="latexExportModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title"><i class="bi bi-file-earmark-code"></i> LaTeX Table Export</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <p class="text-muted">Copy the LaTeX code below. Requires packages: <code>booktabs</code>, <code>tabularx</code></p>
+                    </div>
+                    <div class="position-relative">
+                        <button class="btn btn-sm btn-outline-primary position-absolute top-0 end-0 m-2" onclick="copyLatexToClipboard()">
+                            <i class="bi bi-clipboard"></i> Copy
+                        </button>
+                        <pre class="bg-light p-3 rounded" style="max-height: 60vh; overflow: auto;"><code id="latexCodeContent">Loading...</code></pre>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="downloadLatexFile()">
+                        <i class="bi bi-download"></i> Download .tex
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Plagiarism Stats Modal -->
+    <div class="modal fade" id="plagiarismStatsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title"><i class="bi bi-graph-up"></i> Plagiarism Label Statistics</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="plagiarismStatsBody">
+                    <p class="text-muted">Loading...</p>
+                </div>
+                <div class="modal-footer justify-content-between">
+                    <button type="button" class="btn btn-danger btn-sm" onclick="clearPaperStats()">
+                        <i class="bi bi-trash"></i> Clear All Labels
+                    </button>
+                    <div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm me-2" onclick="showPlagiarismStats()">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Initialize paperWritingState from server before loading app.js.
+        // This lets renderPairs() show paper mode controls without waiting for API.
+        window._paperModeEnabledFromServer = {{ 'true' if paper_mode_enabled else 'false' }};
+        window._paperModeThresholdFromServer = {{ '%.4f' % paper_mode_threshold_float }};
+    </script>
+    <script src="{{ url_for('static', filename='js/app.js') }}?v={{ js_version }}"></script>
+</body>
+</html>
+
