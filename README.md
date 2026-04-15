@@ -53,3 +53,7 @@ Methodology-to-code traceability is documented in [docs/METHODOLOGY_TRACEABILITY
 - `feature_names_similarity` is computed only on non-default/custom feature names.
 - LCS fuzzy and fuzzy-coherence options are configurable and represented in both backend and frontend scoring logic.
 
+## Citation
+
+Di Angelo, Luca and Guardiani, Emanuele and Marzola, Antonio, Plagiarism Detection in Parametric CAD Models: A Supervised Similarity Framework for Engineering Education (Preprint). DOI: http://dx.doi.org/10.2139/ssrn.6579743
+
