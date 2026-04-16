@@ -1,4 +1,4 @@
-# CAD Similarity Analyzer (Solid Edge Similarity)
+# CAD Similarity Analyzer
 
 This project provides a web application to analyze pairwise similarity of CAD models, label suspected plagiarism cases, optimize criterion weights from manual labels, and export paper-ready LaTeX tables.
 
